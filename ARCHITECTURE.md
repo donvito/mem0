@@ -134,6 +134,164 @@ sequenceDiagram
     Memory-->>User: ranked memories
 ```
 
+## Sample Usage
+
+The following examples show the most common ways to use Mem0 in Python. The TypeScript SDK follows the same patterns.
+
+### 1. Hosted platform client
+
+Use `MemoryClient` when you want Mem0 to manage the infrastructure. You only need an API key.
+
+```python
+from mem0 import MemoryClient
+
+client = MemoryClient(api_key="your-mem0-api-key")
+
+# Store a memory
+result = client.add(
+    messages="I prefer concise, bullet-point answers and I am allergic to peanuts.",
+    user_id="alice",
+    metadata={"source": "onboarding"},
+)
+print(result["memories"])  # list of stored memory ids
+
+# Search relevant memories
+memories = client.search(
+    query="What should I avoid eating?",
+    user_id="alice",
+    limit=5,
+)
+for m in memories["memories"]:
+    print(m["memory"], m["score"])
+
+# Update a memory
+client.update(memory_id="<id>", data="I am allergic to peanuts and tree nuts.")
+
+# Delete all memories for a user
+client.delete_all(user_id="alice")
+```
+
+### 2. Self-hosted memory with defaults
+
+Use `Memory` when you want everything to run locally. The default configuration uses OpenAI for the LLM and embeddings, so an `OPENAI_API_KEY` is required unless you override those providers.
+
+```python
+from mem0 import Memory
+
+memory = Memory()
+
+memory.add(
+    messages="I am working on a project called Phoenix and I prefer morning standups.",
+    user_id="alice",
+)
+
+results = memory.search(
+    query="Tell me about Alice's project preferences.",
+    user_id="alice",
+)
+for r in results:
+    print(r["memory"])
+```
+
+### 3. Self-hosted with local MiniLM (no API keys)
+
+This setup runs entirely on your own machine using a free HuggingFace MiniLM model for embeddings and a MiniLM cross-encoder for reranking. You need to install `sentence-transformers` first.
+
+```bash
+pip install sentence-transformers
+```
+
+```python
+from mem0 import Memory
+
+config = {
+    "llm": {
+        "provider": "ollama",  # or another local LLM provider
+        "config": {"model": "llama3.1"},
+    },
+    "embedder": {
+        "provider": "huggingface",
+        "config": {
+            "model": "multi-qa-MiniLM-L6-cos-v1",
+            "model_kwargs": {"device": "cpu"},
+        },
+    },
+    "vector_store": {
+        "provider": "qdrant",
+        "config": {"embedding_model_dims": 384},
+    },
+    "reranker": {
+        "provider": "sentence_transformer",
+        "config": {
+            "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+            "device": "cpu",
+        },
+    },
+}
+
+memory = Memory(config=config)
+
+memory.add(
+    messages="I like to review code in the afternoon, not the morning.",
+    user_id="alice",
+)
+
+results = memory.search(
+    query="When does Alice prefer to review code?",
+    user_id="alice",
+)
+for r in results:
+    print(r["memory"], r.get("rerank_score"))
+```
+
+### 4. Working with memory history
+
+Mem0 keeps a version history for each memory, so you can see how a fact evolved over time.
+
+```python
+# Add a memory
+add_result = memory.add(
+    messages="My favorite color is blue.",
+    user_id="alice",
+)
+memory_id = add_result[0]["id"]
+
+# Update it later
+memory.update(memory_id=memory_id, data="My favorite color is green.")
+
+# View the change history
+history = memory.history(memory_id=memory_id)
+for entry in history:
+    print(entry["created_at"], entry["memory"])
+```
+
+### 5. Common parameters
+
+Most `add`, `search`, `get_all`, and `delete_all` calls accept these filters to scope memories:
+
+| Parameter | Purpose |
+|-----------|---------|
+| `user_id` | Memories tied to a specific user |
+| `agent_id` | Memories tied to a specific agent or app |
+| `run_id` | Memories tied to a specific conversation session |
+| `metadata` | Arbitrary key-value tags you can later filter on |
+
+Use them together to build multi-tenant or multi-agent systems:
+
+```python
+memory.add(
+    messages="Agent Beta should use formal tone.",
+    agent_id="beta",
+    metadata={"type": "persona"},
+)
+
+memory.search(
+    query="What tone should Agent Beta use?",
+    agent_id="beta",
+    filters={"type": "persona"},
+)
+```
+
 ## Provider Pattern
 
 Mem0 uses a consistent plugin architecture across five provider categories. Each category has a `base.py` abstract base class and concrete provider implementations.
