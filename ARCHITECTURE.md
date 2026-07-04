@@ -186,6 +186,98 @@ graph LR
 5. Add tests in `tests/<category>/<provider_name>/`
 6. Add optional dependencies to `pyproject.toml`
 
+## MiniLM Support
+
+Mem0 ships with out-of-the-box support for **MiniLM** models from the Hugging Face `sentence-transformers` ecosystem. MiniLM is used in two places: as a lightweight local embedding model and as a cross-encoder reranker. This makes it possible to run Mem0 entirely on local CPU/GPU hardware without external API keys.
+
+### MiniLM as an Embedding Model
+
+The `huggingface` embedder provider uses `sentence-transformers` under the hood. When no model is specified, it defaults to `multi-qa-MiniLM-L6-cos-v1`.
+
+```python
+from mem0 import Memory
+
+config = {
+    "embedder": {
+        "provider": "huggingface",
+        "config": {
+            "model": "multi-qa-MiniLM-L6-cos-v1",
+            "model_kwargs": {"device": "cpu"},  # or "cuda"
+        },
+    },
+    "vector_store": {
+        "provider": "qdrant",  # or any other supported vector store
+        "config": {"embedding_model_dims": 384},
+    },
+}
+
+memory = Memory(config=config)
+```
+
+Key configuration fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `provider` | `str` | Must be `"huggingface"` |
+| `config.model` | `str` | HuggingFace `sentence-transformers` model name, e.g. `multi-qa-MiniLM-L6-cos-v1`, `all-MiniLM-L6-v2`, `paraphrase-MiniLM-L6-v2` |
+| `config.model_kwargs` | `dict` | Arguments passed to `SentenceTransformer(...)`, such as `device`, `trust_remote_code`, etc. |
+| `config.embedding_dims` | `int` | Optional; auto-detected from the model if omitted. MiniLM-L6 models emit 384 dimensions. |
+| `config.huggingface_base_url` | `str` | Optional; if set, the provider switches to an OpenAI-compatible Text Embeddings Inference (TEI) server instead of loading the model locally. |
+
+### MiniLM as a Reranker
+
+The `sentence_transformer` reranker provider uses a cross-encoder MiniLM model to rescore candidates retrieved from vector search. The default model is `cross-encoder/ms-marco-MiniLM-L-6-v2`.
+
+```python
+from mem0 import Memory
+
+config = {
+    "embedder": {
+        "provider": "huggingface",
+        "config": {"model": "multi-qa-MiniLM-L6-cos-v1"},
+    },
+    "reranker": {
+        "provider": "sentence_transformer",
+        "config": {
+            "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+            "device": "cpu",
+            "batch_size": 32,
+            "show_progress_bar": False,
+        },
+    },
+}
+
+memory = Memory(config=config)
+```
+
+Reranker-specific fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `provider` | `str` | `"cohere"` | Must be `"sentence_transformer"` to use the local MiniLM cross-encoder |
+| `config.model` | `str` | `"cross-encoder/ms-marco-MiniLM-L-6-v2"` | HuggingFace cross-encoder model name |
+| `config.device` | `str` | `None` | Device to run on (`"cpu"`, `"cuda"`, etc.). `None` auto-detects. |
+| `config.batch_size` | `int` | `32` | Batch size for scoring query-document pairs |
+| `config.show_progress_bar` | `bool` | `False` | Whether to show a progress bar during reranking |
+| `config.top_k` | `int` | `None` | Number of top documents to return after reranking |
+
+### Requirements
+
+For either MiniLM use case, install the `sentence-transformers` dependency (included in the HuggingFace optional dependency group):
+
+```bash
+pip install sentence-transformers
+# or, when installing mem0ai with extras:
+pip install "mem0ai[huggingface]"
+```
+
+### Why MiniLM?
+
+- **Small footprint**: L6 variants are roughly 80 MB and run comfortably on CPU.
+- **No API keys**: Works entirely offline after the model is downloaded.
+- **Fast inference**: Suitable for local prototypes and low-latency self-hosted deployments.
+- **Well-known defaults**: The default choices (`multi-qa-MiniLM-L6-cos-v1` for embeddings, `ms-marco-MiniLM-L-6-v2` for reranking) are optimized for semantic search and passage ranking.
+
 ## Graph Memory
 
 Graph memory is an optional layer on top of vector memory that enables relationship-aware retrieval. It is configured through the `graph` section of `MemoryConfig` and can extract entities and relationships from conversations to improve recall.
