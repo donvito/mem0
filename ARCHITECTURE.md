@@ -413,3 +413,98 @@ All publishing uses OIDC trusted publishing, so no registry tokens or secrets ar
 - `docs/` — public documentation site
 - `server/docker-compose.yml` — local self-hosted development stack
 - `openmemory/docker-compose.yml` — local OpenMemory development stack
+
+## Layman's Guide: What Mem0 Does
+
+This section explains the ideas above in plain language for anyone who is not a software engineer.
+
+### What is Mem0, in one sentence?
+
+Mem0 is a "memory bank" that lets AI assistants remember facts about you across many conversations, so the assistant feels more personal and consistent each time you talk to it.
+
+### Think of it like a smart notebook
+
+Imagine you are chatting with a helpful assistant. Over time you mention things like:
+
+- "I am allergic to peanuts."
+- "I prefer short, bullet-point answers."
+- "I am working on a project called Phoenix."
+
+Mem0 writes those facts into a notebook, connects related facts, and later reminds the assistant of them when they are relevant. The assistant does not have to remember everything itself.
+
+### Hosted vs. self-hosted
+
+| Option | Simple analogy | Who runs it? |
+|--------|---------------|--------------|
+| **Hosted** | A bank safety deposit box managed by the bank | Mem0 runs the servers; you just use the API |
+| **Self-hosted** | A safe in your own house | You run the software on your own computer or servers |
+
+Hosted is easier to start with. Self-hosted gives you more privacy and control because your data stays on your machines.
+
+### What is an embedding?
+
+An embedding turns a sentence into a list of numbers that captures its meaning. Two sentences with similar meanings get similar numbers. This lets Mem0 find memories by meaning instead of just matching exact words.
+
+Think of it as translating every sentence into a point on a map; sentences that mean similar things end up close together.
+
+### What is a vector store?
+
+A vector store is the database that keeps all those number-lists. When you ask a question, Mem0 quickly searches that database for the closest matching memories.
+
+### What is graph memory?
+
+Graph memory is an extra layer that remembers *relationships* between facts, such as:
+
+- "Alice works at Acme Corp."
+- "Acme Corp is based in London."
+
+If you later ask, "Where does Alice work?" or "Which companies are in London?", the graph helps Mem0 answer by following those connections.
+
+### What is an LLM?
+
+LLM stands for "Large Language Model." It is the AI that understands and writes human language. Mem0 uses an LLM to:
+
+- Pull out important facts from your messages.
+- Decide how to update old memories.
+- Summarize or explain stored information when needed.
+
+### What is a reranker?
+
+When Mem0 searches the vector store, it may get many candidate memories. A reranker is a second model that scores those candidates to put the most useful ones at the top.
+
+Analogy: the vector store finds a shelf of possibly relevant books; the reranker picks the best ones for your specific question.
+
+### What is MiniLM?
+
+MiniLM is a small, free, open-source family of language models. Mem0 can use MiniLM for both embeddings and reranking. It is popular because it is:
+
+- **Tiny**: about 80 MB, smaller than most videos on your phone.
+- **Free**: no API key or subscription needed.
+- **Private**: runs entirely on your computer.
+- **Fast enough**: works well for prototypes and small-to-medium projects.
+
+### What is MCP?
+
+MCP (Model Context Protocol) is a standard way for AI editors and agents to talk to Mem0. It is like a universal USB-C port for memory: once an editor supports MCP, it can use Mem0 without custom code.
+
+### What is CI/CD?
+
+CI/CD is the robot helper that checks and ships code automatically. When a developer opens a change, CI runs tests and linting. When a release is tagged, CD publishes the updated package to PyPI or npm.
+
+### What is a provider?
+
+A provider is a swappable plugin. Mem0 has providers for LLMs, embeddings, vector stores, graph stores, and rerankers. This means you can mix and match: for example, use OpenAI for the LLM, MiniLM for embeddings, and Qdrant for the vector store, all in one project.
+
+### The big picture
+
+```mermaid
+graph LR
+    A[You chat with an AI] --> B[Mem0 reads the conversation]
+    B --> C[Extracts important facts]
+    C --> D[Stores facts as vectors + optional relationships]
+    E[Later question] --> F[Mem0 searches stored facts]
+    F --> G[Returns the most relevant memories]
+    G --> H[AI gives a personalized answer]
+```
+
+In short, Mem0 turns scattered conversations into a reusable, searchable memory that makes AI assistants feel more helpful and personal.
